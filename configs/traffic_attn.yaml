@@ -1,0 +1,16 @@
+# traffic ablation row: attn
+#   python3 scripts/08_traffic_ext.py configs/traffic_attn.yaml
+name: attn
+attn: true          # cross-series attention, alpha starts at 0
+tau: false           # learned per-series memory length, mask starts open
+
+dilations: [1, 2, 4, 8, 16, 20, 32, 32, 32]
+channels: 16
+emb_dim: 32
+lr: 0.01
+epochs: 8
+steps_per_epoch: 100   # one step = one origin with all 963 lanes
+s0: 16.0               # mask temperature, annealed to s_end
+s_end: 1.0
+seeds: [1, 2, 3]
+threads: 3

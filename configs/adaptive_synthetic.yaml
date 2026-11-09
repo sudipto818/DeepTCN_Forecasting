@@ -1,0 +1,45 @@
+# Adaptive receptive field, synthetic diagnostic panel (steps 2, 4, 5).
+#   python3 scripts/07_adaptive.py configs/adaptive_synthetic.yaml
+
+tag: synthetic
+threads: 4
+verbose: false
+
+panel:
+  n_per_type: 500      # series per type, 4 types
+  in_len: 64           # input window L; receptive field of the encoder is 63
+  out_len: 12
+  n_train: 6           # windows per series, in time order
+  n_val: 2
+  n_test: 2
+  noise: 0.3
+  d_keep: 3            # type D keeps only this many real observations
+  seed: 0
+
+model:
+  dilations: [1, 2, 4, 8, 16]
+  channels: 16
+  kernel: 2
+
+train:
+  epochs: 30
+  batch_size: 128
+  lr: 0.005
+  lambda: 0.001        # penalty lambda * mean(tau / L)
+  s_end: 1.0           # mask temperature, annealed from L/10 to this
+  patience: 30         # = epochs, so the annealing always finishes
+  gate_warmup: 5       # epochs with the gate frozen at the full window
+  gate_lr_mult: 0.2    # gate learning rate = lr * this
+
+quantiles: [0.1, 0.5, 0.9]
+seeds: [1]
+
+# true memory length of each type, only used to draw the reference lines
+true_scale: {A: 7, B: 24, C: 2, D: 3}
+plot_row: per_series
+
+rows:
+  - {name: baseline, gate: none}
+  - {name: fixed_24, gate: fixed, fixed_len: 24}
+  - {name: global_tau, gate: global}
+  - {name: per_series, gate: series}
