@@ -175,7 +175,8 @@ def train(name, seed=1, device=None, out_dir=None, n_per_epoch=20000,
         bad         = state["bad"]
         rng         = np.random.default_rng(seed)  # recreate rng ...
         rng.bit_generator.state = state["rng"]     # ... then restore its state
-        torch.set_rng_state(state["torch_rng"])
+        # the checkpoint was loaded onto `device`; torch needs its RNG state on the CPU
+        torch.set_rng_state(state["torch_rng"].cpu())
         print(f"resumed from epoch {state['epoch']}  "
               f"best so far {round(best, 5)} at epoch {best_epoch}")
     else:
