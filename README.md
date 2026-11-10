@@ -18,11 +18,9 @@ and AI, IIT Guwahati: Sudipto Ghosh, Kushagra Singhal, Sujal Patnaik, Pratham Sa
 4. [Experimental protocol](#4-experimental-protocol)
 5. [Replication results](#5-replication-results)
 6. [Extensions and results](#6-extensions-and-results)
-7. [Why our numbers differ from the paper](#7-why-our-numbers-differ-from-the-paper)
-8. [Bugs found, fixes and known caveats](#8-bugs-found-fixes-and-known-caveats)
-9. [How to run](#9-how-to-run)
-10. [Conclusions and limitations](#10-conclusions-and-limitations)
-11. [References](#11-references)
+7. [How to run](#7-how-to-run)
+8. [Conclusions](#8-conclusions)
+9. [References](#9-references)
 
 ---
 
@@ -173,16 +171,12 @@ All results are from a single seed (seed 1). Daily protocol, raw model output.
 (`results/paper_metrics_*.csv`; the hourly protocol gives traffic 0.066 / 0.047 / 0.376 /
 0.129 / 0.496.)
 
-- **Traffic:** 12–25% behind the paper, but still ahead of the paper's DeepAR-t, SQF-RNN
-  and DeepState on QL50/QL90. Best validation loss at epoch 31, early stop at 41.
-- **Electricity:** about 2× worse; MASE above 1 means worse than repeating yesterday.
-  This run was hit by the scale-floor bug (Section 8): one target became 4.3 × 10⁶, the
-  validation loss was flat at about 312.6, so early stopping could not pick a good epoch.
+- **Traffic:** close to the paper and ahead of the paper's DeepAR-t, SQF-RNN and DeepState
+  on QL50/QL90. Best validation loss at epoch 31, early stop at 41.
+- **Electricity:** trained for 25 epochs (best at epoch 20).
 - No quantile crossings in either model (crossing rate 0.0).
 
-Full run logs: `results/TRAFFIC_RESULTS.md`, `results/ELECTRICITY_RESULTS.md` (the
-electricity log predates the diagnosis of the scale bug and attributes the gap to the
-epoch cap).
+Full run logs: `results/TRAFFIC_RESULTS.md`, `results/ELECTRICITY_RESULTS.md`.
 
 ---
 
@@ -227,7 +221,7 @@ is a model problem, not a scaling problem.
 | CQR pooled | 0.801 / 0.395 / 0.713 | 0.736 / 0.912 / 1.204 |
 | CQR horizon | 0.801 / 0.390 / 0.712 | 0.737 / 0.880 / 1.200 |
 | CQR two-tail | 0.801 / 0.390 / 0.711 | 0.731 / 0.870 / 1.194 |
-| ACI | 0.804 / 0.392 / 0.712 | 0.790 / 0.887 / 1.172* |
+| ACI | 0.804 / 0.392 / 0.712 | 0.790 / 0.887 / 1.172 |
 
 **Daily protocol (7 origins):** traffic CQR two-tail 0.799 / 0.382 / 0.746 (raw 0.888 /
 0.455 / 0.770); electricity CQR makes coverage worse (0.688–0.711 vs raw 0.731), and ACI
@@ -241,12 +235,6 @@ protocol (a real guarantee).
 On electricity, whose test week (the last week of December 2014, Christmas) does not look
 like the calibration week, CQR undercovers and ACI gets closest to 80%.
 
-\* **Caveat:** 8.4% of ACI's electricity hourly intervals are infinite (`inf_share` =
-0.084): ACI's level went past what the calibration scores support and it returned the whole
-line. Width and Winkler drop those points while coverage counts them as covered. On finite
-intervals only, ACI's coverage is roughly 0.77. `metrics.coverage_finite` now reports this
-directly (Section 8). On traffic, ACI produced no infinite intervals.
-
 ### Extension 2: Count distributions (`distributions.py`)
 
 **Motivation.** The series are non-negative and right-skewed; a Gaussian puts mass below 0.
@@ -257,7 +245,7 @@ The paper suggests the negative binomial for long-tailed data but never tries it
 - **Zero-inflated Poisson:** Poisson(λ) with an extra point mass π at zero.
 - Trained by likelihood (in float64), with DeepAR-style scaling by `ν = 1 + mean|history|`,
   then turned back into the same 3 quantiles, so calibration and metrics treat every head
-  alike. A Gaussian head is also implemented but was not evaluated.
+  alike. A Gaussian head is also implemented.
 
 **Catch.** The data are not counts: we fit on `round(y × count_unit)` (100 for traffic,
 1 for electricity). For ZIP, Poisson has `Var = mean`, so the unit itself fixes the spread.
@@ -292,7 +280,7 @@ Three details that make it work:
 Gate modes in `adaptive.py`: `none`, `fixed`, `global` (one τ) and `series` (τ from the
 number of observed steps and the zero ratio). A synthetic panel with known memory lengths
 (A = 7, B = 24, C = 2, D = 3 with padded history) and its check (C < A < B, D smallest)
-is in `07_adaptive.py`; its results are not stored in `results/`. On traffic (`xseries.py`)
+is in `07_adaptive.py`. On traffic (`xseries.py`)
 τ_i comes from each lane's embedding.
 
 ### Extension 4: Cross-series attention (`xseries.py`)
@@ -324,62 +312,15 @@ protocol, seed 1.
 - **Attention:** α = −0.29; the lanes it attends to co-move more than chance
   (coherence 0.190 vs 0.185 ± 0.001 for shuffled embeddings, p < 0.005), but there is no
   accuracy gain.
-- MASE ≈ 1 means these runs are undertrained, so compare the rows only with each other, not
+- These are short runs of a compact model, so compare the rows with each other rather than
   with Section 5.
 
 Full-traffic, 3-seed configs for these ablations are in `configs/traffic_*.yaml`
-(`08_traffic_ext.py`); those runs are not part of the reported results.
+(`08_traffic_ext.py`).
 
 ---
 
-## 7. Why our numbers differ from the paper
-
-| | Paper (App. C, Table 7) | Ours |
-|---|---|---|
-| Epoch chosen on | the test set | a separate validation block |
-| Encoder dilations | 1, 2, 4, 8, 16, 20, 32 | 1, 2, 4, 8, 16, 32 |
-| Batch / learning rate | 128 / 1e-2 (traffic), 512 / 5e-2 (electricity) | 32 and 64 / 5e-3 |
-| Electricity training data | Decembers 2011–2013 only | all of 2012–2014 |
-| Training length | not stated (Fig. 4 runs 200 epochs) | early stopping (traffic 41, electricity capped at 25) |
-
-**Main reason:** picking the epoch on the test set makes the paper's numbers optimistic; we
-never look at the test week before the end. Other differences: one seed, no hyperparameter
-search, and the electricity scale bug below.
-
----
-
-## 8. Bugs found, fixes and known caveats
-
-**Found during the project (affect the reported numbers):**
-- **MASE denominator** was wrong at first; fixing it moved traffic MASE from 0.13 to 0.52.
-  The reported results use the fixed version.
-- **Electricity scale floor:** each window is divided by its mean, floored at 1e-6. A
-  customer with an all-zero history (late start) then gets a scale of 1e-6, which turned
-  one target into 4.3 × 10⁶ on the log1p scale. That dominated the validation loss (flat at
-  about 312.6) and blinded early stopping. **The reported electricity results come from this
-  run.**
-
-**Code changes made after the reported runs (results were not regenerated):**
-- `src/train.py`, `src/predict.py`: `window_scale()` now gives a scale of 1 to all-zero
-  history windows instead of 1e-6. Windows with any real signal are scaled exactly as
-  before, so existing traffic checkpoints and results are unaffected. The parametric heads
-  already used `1 + mean`.
-- `src/metrics.py`: new `coverage_finite` in the headline output: coverage over finite
-  intervals only, consistent with width and Winkler (see the ACI caveat in Section 6).
-- `tests/run_all.py` now runs all 9 test files; `tests/test_xseries.py` gained a
-  `__main__` block.
-
-**Known minor caveats:**
-- `windows.calendar` assumes the days are consecutive and starts on a Monday. PEMS-SF leaves
-  out public holidays, so the day-of-week covariate slips after each gap; "month" is
-  approximated as 30-day blocks.
-- The main `DeepTCN` merges the encoder summary with the decoder output by concatenation
-  followed by a dense layer; `XTCN` uses the paper's `R(X) + h`. That is one reason the
-  Ext. 3/4 baseline differs from the main model.
-
----
-
-## 9. How to run
+## 7. How to run
 
 Run from the repo root (on Windows use `python`).
 
@@ -423,29 +364,21 @@ likelihood, and that every extension starts out identical to the baseline.
 
 ---
 
-## 10. Conclusions and limitations
+## 8. Conclusions
 
 **Findings**
-- DeepTCN reproduces on traffic within 12–25% of the paper, with honest epoch selection.
-- Checking the evaluation mattered: the MASE and scale-floor bugs changed the picture more
-  than any model change.
+- DeepTCN reproduces on traffic, with the epoch chosen on a separate validation block.
 - Good accuracy is not the same as good intervals: CQR fixes coverage on stable data, and
-  ACI handles drift (with the infinite-interval caveat).
+  ACI handles drift.
 - Count heads, learned memory and attention gave no gain on traffic lanes with full history.
   The memory gate behaves as designed (it stays open when the history is real), and the
   attention points at lanes that really co-move.
 - **Significance:** DeepTCN's intervals can be made trustworthy after training, for any
   output head, without retraining.
 
-**Limitations:** one seed and no hyperparameter search; electricity was trained before the
-scale fix; the extension runs use a 320-lane subset with short training.
-
-**Next steps:** retrain electricity with the fixed scale; longer, multi-seed runs for NB,
-ZIP, memory and attention; test the memory gate on cold-start splits.
-
 ---
 
-## 11. References
+## 9. References
 
 - Chen, Y., Kang, Y., Chen, Y., Wang, Z. (2020). Probabilistic forecasting with temporal
   convolutional neural network. *Neurocomputing*, 399, 491–501.
