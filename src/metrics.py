@@ -63,6 +63,16 @@ def coverage(y, lo, hi):
     return float(inside.mean())
 
 
+def coverage_finite(y, lo, hi):
+    """Coverage over finite intervals only. ACI can return the whole line,
+    which covers trivially; width and winkler already drop those points,
+    so this is the coverage that matches them."""
+    ok = np.isfinite(lo) & np.isfinite(hi)
+    if ok.sum() == 0:
+        return float("nan")
+    return coverage(y[ok], lo[ok], hi[ok])
+
+
 def width(y, lo, hi):
     """Mean interval width over mean |y|, finite intervals only."""
     w = hi - lo
@@ -169,6 +179,7 @@ def headline(y, preds, lo, hi, quantiles, mscale, alpha):
     mscale is the MASE denominator from mase_scale."""
     out = point_metrics(y, preds, quantiles, mscale)
     out["coverage"] = coverage(y, lo, hi)
+    out["coverage_finite"] = coverage_finite(y, lo, hi)
     out["width"] = width(y, lo, hi)
     out["winkler"] = winkler(y, lo, hi, alpha)
     out["crossing"] = crossing_rate(preds)

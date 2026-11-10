@@ -105,3 +105,11 @@ def test_gradient_reaches_alpha_and_tau():
     m(y, s, ch, cf).pow(2).mean().backward()
     assert m.alpha.grad.abs() > 0
     assert m.tau_mlp[2].bias.grad.abs() > 0
+
+
+if __name__ == "__main__":
+    for name, f in list(globals().items()):
+        if name.startswith("test_"):
+            f()
+            print(name, "ok")
+    print("all xseries tests passed")

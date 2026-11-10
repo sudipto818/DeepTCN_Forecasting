@@ -6,7 +6,7 @@ import torch
 import config
 import distributions
 import windows
-from train import build_model, make_batch, run_tag
+from train import build_model, make_batch, run_tag, window_scale
 
 
 def predict_split(model, y, cal, origins, n_series, device, log_target,
@@ -50,7 +50,7 @@ def predict_split(model, y, cal, origins, n_series, device, log_target,
 
             # undo the window scaling, then the log if there was one
             h = np.log1p(y_hist) if log_target else y_hist
-            s = np.maximum(np.abs(h).mean(axis=1), 1e-6)
+            s = window_scale(h)
             p = p * s[:, None, None]
 
             if log_target:

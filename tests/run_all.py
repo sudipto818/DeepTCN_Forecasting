@@ -10,6 +10,10 @@ files = [
     "test_cqr.py",
     "test_aci.py",
     "test_data_traffic.py",
+    "test_model.py",
+    "test_distributions.py",
+    "test_adaptive.py",
+    "test_xseries.py",
 ]
 
 fails = 0

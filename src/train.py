@@ -30,11 +30,22 @@ def build_model(name, n_series, dist):
     )
 
 
+SCALE_EPS = 1e-6
+
+
+def window_scale(y_hist):
+    """Mean |y| of each input window. A (near) all-zero history gets 1, not
+    a tiny floor: a 1e-6 floor turned one electricity target into 4.3e6
+    (log1p scale) and blinded early stopping. Windows with any real signal
+    are scaled exactly as before, so old checkpoints still line up."""
+    s = np.abs(y_hist).mean(axis=1)
+    return np.where(s < SCALE_EPS, 1.0, s)
+
+
 def scale_window(y_hist, y_tgt):
     """Divide both by the mean of the input window, so series of different
     size look alike to the model. Returns the scale so it can be undone."""
-    s = np.abs(y_hist).mean(axis=1)
-    s = np.maximum(s, 1e-6)
+    s = window_scale(y_hist)
     return y_hist / s[:, None], y_tgt / s[:, None], s
 
 
